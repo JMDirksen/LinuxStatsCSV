@@ -35,6 +35,7 @@ swp_used=$(calc "$swp_total - $swp_free")
 swp_percent=$(round $(calc "$swp_used / $swp_total * 100"))
 
 # Get disk activity percentage
+last_disk_io_ms=$(cat disk_io_ms.tmp 2>/dev/null || echo 0)
 root_device=$(df / | tail -1 | awk '{print $1}')
 if [[ "$root_device" == /dev/mapper/* ]]; then
   disk_device=$(lsblk -no KNAME "$root_device" | head -n 1)
@@ -42,8 +43,10 @@ else
   disk_device=$(basename "$root_device" | sed 's/[0-9]*$//')
 fi
 disk_io_ms=$(awk -v dev="$disk_device" '$3==dev {print $14}' /proc/diskstats)
-# Convert ms to percent of last 5 minutes (300,000 ms)
-disk_activity_percent=$(round $(calc "$disk_io_ms / 300000 * 100"))
+echo "$disk_io_ms" > disk_io_ms.tmp
+diff_disk_io_ms=$(calc "$disk_io_ms - $last_disk_io_ms")
+# Convert diff to percentage over 5 minutes (300000 ms)
+disk_activity_percent=$(round $(calc "$diff_disk_io_ms / 300000 * 100"))
 
 # Get disk full percentage
 dsk_full_percent=$(df / | tail -1 | field 5 | tr -d '%')
