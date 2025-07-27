@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 
 # Create stats.csv with headers if it doesn't exist
 if [ ! -f stats.csv ]; then
-  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk full %,Uptime %" > stats.csv
+  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk space %,Uptime %" > stats.csv
 fi
 
 # Functions
@@ -60,15 +60,15 @@ diff_disk_io_ms=$(calc "$disk_io_ms - $last_disk_io_ms")
 # Convert diff to percentage over 15 minutes (900000 ms)
 disk_activity_percent=$(round $(calc "$diff_disk_io_ms / 900000 * 100"))
 
-# Get disk full percentage
-dsk_full_percent=$(df / | tail -1 | field 5 | tr -d '%')
+# Get disk space percentage
+dsk_space_percent=$(df / | tail -1 | field 5 | tr -d '%')
 
 # Get uptime percentage
 uptime_minutes=$(awk '{print int($1 / 60)}' /proc/uptime)
 uptime_percent=$(round $(calc "$uptime_minutes / (2 * 24 * 60) * 100"))
 
 # Prepare CSV line and write to stats.csv
-csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$disk_activity_percent,$dsk_full_percent,$uptime_percent"
+csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$disk_activity_percent,$dsk_space_percent,$uptime_percent"
 echo "$csv" >> stats.csv
 
 # Limit stats.csv to the last 2 days of 15-minute intervals when the file exceeds this limit
@@ -83,6 +83,6 @@ echo "DateTime: $dt"
 echo "CPU: $cpu_percent%"
 echo "Memory: $mem_percent%"
 echo "Swap: $swp_percent%"
-echo "Disk Activity: $disk_activity_percent%"
-echo "Disk Full: $dsk_full_percent%"
+echo "Disk activity: $disk_activity_percent%"
+echo "Disk space: $dsk_space_percent%"
 echo "Uptime: $uptime_percent%"
