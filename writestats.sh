@@ -41,9 +41,12 @@ dsk_percent=$(df / | tail -1 | field 5 | tr -d '%')
 csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$dsk_percent"
 echo "$csv" >> stats.csv
 
-# Limit stats.csv to the last 30 days of 5-minute intervals
+# Limit stats.csv to the last 30 days of 5-minute intervals when the file exceeds this limit
 limit_records=$((30*24*60/5)) # 30 days of 5-minute intervals
-{ head -n 1 stats.csv; tail -n $limit_records stats.csv | sed '1d'; } > stats.tmp && mv stats.tmp stats.csv
+total_lines=$(wc -l < stats.csv)
+if [ "$total_lines" -gt "$((limit_records + 1))" ]; then
+  { head -n 1 stats.csv; tail -n +2 stats.csv | tail -n $limit_records; } > stats.tmp && mv stats.tmp stats.csv
+fi
 
 # Print the output to the console
 echo "DT: $dt, CPU: $cpu_percent%, Mem: $mem_percent%, Swp: $swp_percent%, Dsk: $dsk_percent%"

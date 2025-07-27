@@ -14,6 +14,7 @@ Go to: http://hostname:57475
 crontab -e
 ```
 ```
+SHELL=/bin/bash
 @reboot ~/LinuxStatsCSV/listener.sh > /dev/null 2>&1
 */5 * * * * ~/LinuxStatsCSV/writestats.sh > /dev/null 2>&1
 ```
