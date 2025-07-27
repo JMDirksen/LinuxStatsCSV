@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 
 # Create stats.csv with headers if it doesn't exist
 if [ ! -f stats.csv ]; then
-  echo "DT,CPU,Mem,Swp,Dsk" > stats.csv
+  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk full %" > stats.csv
 fi
 
 # Functions
@@ -34,11 +34,22 @@ swp_free=$(grep SwapFree /proc/meminfo | field 2)
 swp_used=$(calc "$swp_total - $swp_free")
 swp_percent=$(round $(calc "$swp_used / $swp_total * 100"))
 
-# Get disk usage percentage
-dsk_percent=$(df / | tail -1 | field 5 | tr -d '%')
+# Get disk activity percentage
+root_device=$(df / | tail -1 | awk '{print $1}')
+if [[ "$root_device" == /dev/mapper/* ]]; then
+  disk_device=$(lsblk -no KNAME "$root_device" | head -n 1)
+else
+  disk_device=$(basename "$root_device" | sed 's/[0-9]*$//')
+fi
+disk_io_ms=$(awk -v dev="$disk_device" '$3==dev {print $14}' /proc/diskstats)
+# Convert ms to percent of last 5 minutes (300,000 ms)
+disk_activity_percent=$(round $(calc "$disk_io_ms / 300000 * 100"))
+
+# Get disk full percentage
+dsk_full_percent=$(df / | tail -1 | field 5 | tr -d '%')
 
 # Prepare CSV line and write to stats.csv
-csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$dsk_percent"
+csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$disk_activity_percent,$dsk_full_percent"
 echo "$csv" >> stats.csv
 
 # Limit stats.csv to the last 30 days of 5-minute intervals when the file exceeds this limit
@@ -49,4 +60,9 @@ if [ "$total_lines" -gt "$((limit_records + 1))" ]; then
 fi
 
 # Print the output to the console
-echo "DT: $dt, CPU: $cpu_percent%, Mem: $mem_percent%, Swp: $swp_percent%, Dsk: $dsk_percent%"
+echo "DateTime: $dt"
+echo "CPU: $cpu_percent%"
+echo "Memory: $mem_percent%"
+echo "Swap: $swp_percent%"
+echo "Disk Activity: $disk_activity_percent%"
+echo "Disk Full: $dsk_full_percent%"
