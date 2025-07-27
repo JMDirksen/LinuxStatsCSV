@@ -36,13 +36,25 @@ swp_percent=$(round $(calc "$swp_used / $swp_total * 100"))
 
 # Get disk activity percentage
 last_disk_io_ms=$(cat disk_io_ms.tmp 2>/dev/null || echo 0)
-root_device=$(df / | tail -1 | awk '{print $1}')
-if [[ "$root_device" == /dev/mapper/* ]]; then
-  disk_device=$(lsblk -no KNAME "$root_device" | head -n 1)
-else
-  disk_device=$(basename "$root_device" | sed 's/[0-9]*$//')
+root_device_kname=$(lsblk -no KNAME,MOUNTPOINT | awk '$2 == "/" {print $1}')
+echo "Root device: $root_device_kname"
+if [ -z "$root_device_kname" ]; then
+    echo "Error: Could not determine the device mounted at /."
+    exit 1
 fi
-disk_io_ms=$(awk -v dev="$disk_device" '$3==dev {print $14}' /proc/diskstats)
+current_device="$root_device_kname"
+top_parent_device=""
+while true; do
+    parent_kname=$(lsblk -no PKNAME,KNAME | awk -v current="$current_device" '$2 == current {print $1}' 2>/dev/null)
+    parent_kname=$(echo "$parent_kname" | tr -d '[:space:]')
+    if [ -z "$parent_kname" ]; then
+        top_parent_device="$current_device"
+        break
+    else
+        current_device="$parent_kname"
+    fi
+done
+disk_io_ms=$(awk -v dev="$top_parent_device" '$3==dev {print $14}' /proc/diskstats)
 echo "$disk_io_ms" > disk_io_ms.tmp
 diff_disk_io_ms=$(calc "$disk_io_ms - $last_disk_io_ms")
 # Convert diff to percentage over 15 minutes (900000 ms)
