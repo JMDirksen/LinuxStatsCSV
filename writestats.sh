@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 
 # Create stats.csv with headers if it doesn't exist
 if [ ! -f stats.csv ]; then
-  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk space %,Uptime %" > stats.csv
+  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk space %,Uptime (100d) %" > stats.csv
 fi
 
 # Functions
@@ -62,7 +62,7 @@ dsk_space_percent=$(df / | tail -1 | field 5 | tr -d '%')
 
 # Get uptime percentage
 uptime_minutes=$(awk '{print int($1 / 60)}' /proc/uptime)
-uptime_percent=$(round $(calc "$uptime_minutes / (2 * 24 * 60) * 100"))
+uptime_percent=$(round $(calc "$uptime_minutes / (100 * 24 * 60) * 100"))
 
 # Prepare CSV line and write to stats.csv
 csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$disk_activity_percent,$dsk_space_percent,$uptime_percent"
