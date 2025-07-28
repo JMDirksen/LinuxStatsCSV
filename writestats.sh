@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 
 # Config
-interval_minutes=5   # The interval this script runs at (as configured in cron)
+interval_minutes=15  # The interval this script runs at (as configured in cron)
 keep_hours=24        # Statistics history length
 
 # Calculate how many records should be kept in the csv file
