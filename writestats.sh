@@ -1,6 +1,13 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
+# Config
+interval_minutes=5   # The interval this script runs at (as configured in cron)
+keep_hours=24        # Statistics history length
+
+# Calculate how many records should be kept in the csv file
+keep_records=$(($keep_hours * 60 / $interval_minutes))
+
 # Create stats.csv with headers if it doesn't exist
 if [ ! -f stats.csv ]; then
   echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk space %,Uptime (100d) %" > stats.csv
@@ -51,8 +58,8 @@ done
 disk_io_ms=$(awk -v dev="$top_parent_device" '$3==dev {print $14}' /proc/diskstats)
 echo "$disk_io_ms" > disk_io_ms.tmp
 diff_disk_io_ms=$(calc "$disk_io_ms - $last_disk_io_ms")
-# Convert diff to percentage over 15 minutes (900000 ms)
-disk_activity_percent=$(round $(calc "$diff_disk_io_ms / 900000 * 100"))
+# Convert diff to percentage over interval minutes
+disk_activity_percent=$(round $(calc "$diff_disk_io_ms / ($interval_minutes * 60 * 60 * 1000) * 100"))
 if [ $disk_activity_percent -gt 100 ] || [ $disk_activity_percent -lt 0 ]; then
     disk_activity_percent=0
 fi
@@ -68,11 +75,10 @@ uptime_percent=$(round $(calc "$uptime_minutes / (100 * 24 * 60) * 100"))
 csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$disk_activity_percent,$dsk_space_percent,$uptime_percent"
 echo "$csv" >> stats.csv
 
-# Limit stats.csv to the last 2 days of 15-minute intervals when the file exceeds this limit
-limit_records=$((2*24*60/15)) # 2 days of 15-minute intervals
+# Limit stats.csv to the keep_records number of records
 total_lines=$(wc -l < stats.csv)
-if [ "$total_lines" -gt "$((limit_records + 1))" ]; then
-  { head -n 1 stats.csv; tail -n +2 stats.csv | tail -n $limit_records; } > stats.tmp && mv stats.tmp stats.csv
+if [ "$total_lines" -gt "$(($keep_records + 1))" ]; then
+  { head -n 1 stats.csv; tail -n +2 stats.csv | tail -n $keep_records; } > stats.tmp && mv stats.tmp stats.csv
 fi
 
 # Print the output to the console
