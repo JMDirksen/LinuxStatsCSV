@@ -10,7 +10,7 @@ keep_records=$(($keep_hours * 60 / $interval_minutes))
 
 # Create stats.csv with headers if it doesn't exist
 if [ ! -f stats.csv ]; then
-  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk space %,Uptime (100d) %" > stats.csv
+  echo "DateTime,CPU %,Memory %,Swap %,Disk activity %,Disk space %,Uptime (/100d) %" > stats.csv
 fi
 
 # Functions
