@@ -50,7 +50,7 @@ for device in $disk_devices; do
     current_disk_io_ms=$(awk -v dev="$device" '$3==dev {print $14}' /proc/diskstats 2>/dev/null)
     echo "$current_disk_io_ms" > "$device_tmp_file"
     diff_disk_io_ms=$(calc "$current_disk_io_ms - $last_disk_io_ms")
-    disk_activity_percent=$(round $(calc "$diff_disk_io_ms / ($interval_minutes * 60 * 60 * 1000) * 100"))
+    disk_activity_percent=$(round $(calc "$diff_disk_io_ms / ($interval_minutes * 60 * 1000) * 100"))
     if [ $disk_activity_percent -gt 100 ] || [ $disk_activity_percent -lt 0 ]; then
         disk_activity_percent=0
     fi
