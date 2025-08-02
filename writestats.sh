@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 
 # Config
-interval_minutes=15  # The interval this script runs at (as configured in cron)
+interval_minutes=60  # The interval this script runs at (as configured in cron)
 keep_hours=24        # Statistics history length
 
 # Calculate how many records should be kept in the csv file
@@ -41,28 +41,23 @@ swp_free=$(grep SwapFree /proc/meminfo | field 2)
 swp_used=$(calc "$swp_total - $swp_free")
 swp_percent=$(round $(calc "$swp_used / $swp_total * 100"))
 
-# Get disk activity percentage
-last_disk_io_ms=$(cat disk_io_ms.tmp 2>/dev/null || echo 0)
-root_device_kname=$(lsblk -no KNAME,MOUNTPOINT | awk '$2 == "/" {print $1}')
-current_device="$root_device_kname"
-top_parent_device=""
-while true; do
-    parent_kname=$(lsblk -no PKNAME,KNAME | awk -v current="$current_device" '$2 == current {print $1}' 2>/dev/null)
-    if [ -z "$parent_kname" ]; then
-        top_parent_device="$current_device"
-        break
-    else
-        current_device="$parent_kname"
+# Get max activity of all disk devices
+disk_devices=$(lsblk -no KNAME,TYPE,PKNAME | awk '$2=="disk" && $3=="" {print $1}')
+max_disk_activity_percent=0
+for device in $disk_devices; do
+    device_tmp_file="disk_io_ms_${device}.tmp"
+    last_disk_io_ms=$(cat "$device_tmp_file" 2>/dev/null || echo 0)
+    current_disk_io_ms=$(awk -v dev="$device" '$3==dev {print $14}' /proc/diskstats 2>/dev/null)
+    echo "$current_disk_io_ms" > "$device_tmp_file"
+    diff_disk_io_ms=$(calc "$current_disk_io_ms - $last_disk_io_ms")
+    disk_activity_percent=$(round $(calc "$diff_disk_io_ms / ($interval_minutes * 60 * 60 * 1000) * 100"))
+    if [ $disk_activity_percent -gt 100 ] || [ $disk_activity_percent -lt 0 ]; then
+        disk_activity_percent=0
+    fi
+    if [ "$disk_activity_percent" -gt "$max_disk_activity_percent" ]; then
+        max_disk_activity_percent="$disk_activity_percent"
     fi
 done
-disk_io_ms=$(awk -v dev="$top_parent_device" '$3==dev {print $14}' /proc/diskstats)
-echo "$disk_io_ms" > disk_io_ms.tmp
-diff_disk_io_ms=$(calc "$disk_io_ms - $last_disk_io_ms")
-# Convert diff to percentage over interval minutes
-disk_activity_percent=$(round $(calc "$diff_disk_io_ms / ($interval_minutes * 60 * 60 * 1000) * 100"))
-if [ $disk_activity_percent -gt 100 ] || [ $disk_activity_percent -lt 0 ]; then
-    disk_activity_percent=0
-fi
 
 # Get disk space percentage
 dsk_space_percent=$(df / | tail -1 | field 5 | tr -d '%')
@@ -72,7 +67,7 @@ uptime_minutes=$(awk '{print int($1 / 60)}' /proc/uptime)
 uptime_percent=$(round $(calc "$uptime_minutes / (100 * 24 * 60) * 100"))
 
 # Prepare CSV line and write to stats.csv
-csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$disk_activity_percent,$dsk_space_percent,$uptime_percent"
+csv="$dt,$cpu_percent,$mem_percent,$swp_percent,$max_disk_activity_percent,$dsk_space_percent,$uptime_percent"
 echo "$csv" >> stats.csv
 
 # Limit stats.csv to the keep_records number of records
@@ -86,6 +81,6 @@ echo "DateTime: $dt"
 echo "CPU: $cpu_percent%"
 echo "Memory: $mem_percent%"
 echo "Swap: $swp_percent%"
-echo "Disk activity: $disk_activity_percent%"
+echo "Disk activity: $max_disk_activity_percent%"
 echo "Disk space: $dsk_space_percent%"
 echo "Uptime: $uptime_percent%"
